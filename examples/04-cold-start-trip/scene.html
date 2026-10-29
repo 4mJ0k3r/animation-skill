@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>04 Stickman Trips Over Rock</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #f4efe6; }
+  #stage { position: relative; width: 100vmin; height: 100vmin; margin: 0 auto; }
+  canvas { display: block; width: 100%; height: 100%; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c" width="960" height="960"></canvas>
+</div>
+
+<script type="module">
+import { POSES, solve, blendPose, walkPose, drawFigure, DEFAULTS } from './rig.js';
+import { Timeline } from './timeline.js';
+import { Easing } from './easing.js';
+import * as fx from './effects.js';
+import { Camera } from './camera.js';
+
+const SCENE = {
+  fps: 30,
+  duration_s: 4,
+  width: 960,
+  height: 960,
+  groundY: 720,
+  background: '#f4efe6',
+  character: {
+    id: 'hero',
+    color: '#1c1c1c',
+    height: 320,
+    strokeWidth: 7,
+    facing: 1
+  },
+  rock: {
+    x: 490,
+    y: 720,
+    width: 62,
+    height: 30
+  }
+};
+
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+cv.width = SCENE.width;
+cv.height = SCENE.height;
+
+// Camera setup with impact shake
+const cam = new Camera();
+cam.add(0, { x: 480, y: 480, zoom: 1.0, shake: 0 });
+cam.add(58, { x: 480, y: 480, zoom: 1.0, shake: 4 }, Easing.power2Out);
+cam.add(63, { x: 480, y: 480, zoom: 1.0, shake: 0 });
+
+// Pose definitions
+const POSES_CUSTOM = {
+  stumble: {
+    face: 'surprised',
+    torso: 25,
+    headTilt: -20,
+    armL: [120, 20],
+    armR: [-110, -30],
+    legL: [45, 10],
+    legR: [-35, 40]
+  },
+  sprawl: {
+    face: 'oops',
+    torso: 90,
+    headTilt: -75,
+    armL: [-85, 5],
+    armR: [-90, -10],
+    legL: [90, 0],
+    legR: [85, 10]
+  },
+  pushup: {
+    face: 'worried',
+    torso: 40,
+    headTilt: -35,
+    armL: [-35, -50],
+    armR: [-40, -45],
+    legL: [80, 20],
+    legR: [75, 25]
+  },
+  crouch: {
+    face: 'determined',
+    torso: 25,
+    headTilt: -10,
+    legL: [35, 80],
+    legR: [30, 85],
+    armL: [20, 10],
+    armR: [-15, 10]
+  },
+  dustOff: {
+    face: 'happy',
+    torso: 6,
+    headTilt: -4,
+    armL: [40, 60],
+    armR: [-30, 40],
+    legL: [4, 0],
+    legR: [-4, 0]
+  }
+};
+
+// Default hip Y in standing position
+const defaultHipY = SCENE.groundY - (DEFAULTS.thigh + DEFAULTS.shin) * (SCENE.character.height / DEFAULTS.height);
+const sprawlHipY = SCENE.groundY + 115;
+const pushupHipY = SCENE.groundY + 70;
+const crouchHipY = defaultHipY + 15;
+
+function computeSceneState(f) {
+  let charX = 240;
+  let charHipY = defaultHipY;
+  let pose = POSES.neutral;
+  let face = 'happy';
+  let shadowW = 60;
+  let shadowX = 0;
+
+  if (f < 36) {
+    // 1. Approach: confident walk
+    const u = f / 36;
+    charX = 240 + (455 - 240) * u;
+    charHipY = defaultHipY;
+    pose = walkPose(f / 20, 0);
+    face = 'happy';
+    shadowW = 60;
+    shadowX = charX;
+  } else if (f < 45) {
+    // 2. The Trip & Stumble: foot hits the rock at x ~ 480
+    const u = (f - 36) / 9;
+    const ea = Easing.power2Out(u);
+    charX = 455 + (485 - 455) * ea;
+    charHipY = defaultHipY;
+    const walkAtTrip = walkPose(36 / 20, 0);
+    pose = blendPose(walkAtTrip, POSES_CUSTOM.stumble, ea);
+    face = f >= 38 ? 'surprised' : 'happy';
+    shadowW = 60 + 20 * ea;
+    shadowX = charX;
+  } else if (f < 58) {
+    // 3. The Fall: gravity accelerates (power2In)
+    const u = (f - 45) / 13;
+    const ea = Easing.power2In(u);
+    charX = 485 + (540 - 485) * ea;
+    charHipY = defaultHipY + (sprawlHipY - defaultHipY) * ea;
+    pose = blendPose(POSES_CUSTOM.stumble, POSES_CUSTOM.sprawl, ea);
+    face = 'surprised';
+    shadowW = 80 + 70 * ea;
+    shadowX = charX + 15 * ea;
+  } else if (f < 73) {
+    // 4. Impact & Sprawl hold
+    charX = 540;
+    charHipY = sprawlHipY;
+    pose = POSES_CUSTOM.sprawl;
+    face = f >= 66 ? 'worried' : 'oops';
+    shadowW = 150;
+    shadowX = charX + 15;
+  } else if (f < 82) {
+    // 5. Recovery Step 1: Push-up
+    const u = (f - 73) / 9;
+    const ea = Easing.power2Out(u);
+    charX = 540;
+    charHipY = sprawlHipY + (pushupHipY - sprawlHipY) * ea;
+    pose = blendPose(POSES_CUSTOM.sprawl, POSES_CUSTOM.pushup, ea);
+    face = 'worried';
+    shadowW = 150 - 30 * ea;
+    shadowX = charX + 15 * (1 - ea);
+  } else if (f < 92) {
+    // 6. Recovery Step 2: Knees tuck / crouch
+    const u = (f - 82) / 10;
+    const ea = Easing.power2Out(u);
+    charX = 540 + (555 - 540) * ea;
+    charHipY = pushupHipY + (crouchHipY - pushupHipY) * ea;
+    pose = blendPose(POSES_CUSTOM.pushup, POSES_CUSTOM.crouch, ea);
+    face = 'determined';
+    shadowW = 120 - 45 * ea;
+    shadowX = charX;
+  } else if (f < 100) {
+    // 7. Recovery Step 3: Stand up
+    const u = (f - 92) / 8;
+    const ea = Easing.power2Out(u);
+    charX = 555 + (560 - 555) * ea;
+    charHipY = crouchHipY + (defaultHipY - crouchHipY) * ea;
+    pose = blendPose(POSES_CUSTOM.crouch, POSES.neutral, ea);
+    face = 'neutral';
+    shadowW = 75 - 15 * ea;
+    shadowX = charX;
+  } else if (f < 108) {
+    // 8. Settle squash & brush off dust
+    const u = (f - 100) / 8;
+    const ea = Easing.power2Out(u);
+    charX = 560;
+    charHipY = defaultHipY;
+    pose = blendPose(POSES_CUSTOM.dustOff, POSES.neutral, ea);
+    face = 'happy';
+    shadowW = 60;
+    shadowX = charX;
+  } else {
+    // 9. Neutral standing hold
+    charX = 560;
+    charHipY = defaultHipY;
+    pose = POSES.neutral;
+    face = 'neutral';
+    shadowW = 60;
+    shadowX = charX;
+  }
+
+  return { charX, charHipY, pose: { ...pose, face }, shadowW, shadowX };
+}
+
+function drawFrame(frame) {
+  const t = Math.max(0, Math.min(frame, SCENE.fps * SCENE.duration_s - 1));
+  const state = computeSceneState(t);
+  const camState = cam.seek(t);
+  const [shx, shy] = cam.shakeAt(t, camState);
+
+  // Background
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = SCENE.background;
+  ctx.fillRect(0, 0, cv.width, cv.height);
+
+  // Camera transform
+  ctx.save();
+  ctx.translate(cv.width / 2 + shx, cv.height / 2 + shy);
+  ctx.scale(camState.zoom, camState.zoom);
+  ctx.translate(-camState.x, -camState.y);
+
+  // Ground line
+  ctx.strokeStyle = '#d8d0c2';
+  ctx.lineWidth = 2 / camState.zoom;
+  ctx.beginPath();
+  ctx.moveTo(-200, SCENE.groundY);
+  ctx.lineTo(cv.width + 200, SCENE.groundY);
+  ctx.stroke();
+
+  // Rock shadow
+  ctx.fillStyle = '#00000018';
+  ctx.beginPath();
+  ctx.ellipse(SCENE.rock.x, SCENE.rock.y + 4, 36, 7, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Rock prop
+  ctx.save();
+  ctx.translate(SCENE.rock.x - 41, SCENE.rock.y - 40);
+  ctx.beginPath();
+  ctx.moveTo(10, 40);
+  ctx.quadraticCurveTo(20, 10, 45, 12);
+  ctx.quadraticCurveTo(70, 15, 72, 38);
+  ctx.quadraticCurveTo(72, 40, 10, 40);
+  ctx.closePath();
+  ctx.fillStyle = '#8c8275';
+  ctx.fill();
+  ctx.strokeStyle = '#5a5247';
+  ctx.lineWidth = 3.5;
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+  ctx.restore();
+
+  // Character contact shadow
+  ctx.fillStyle = '#00000018';
+  ctx.beginPath();
+  ctx.ellipse(state.shadowX, SCENE.groundY + 4, state.shadowW, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Character
+  ctx.save();
+  ctx.translate(state.charX, state.charHipY);
+  ctx.scale(1, -1);
+  drawFigure(ctx, state.pose, {
+    height: SCENE.character.height,
+    facing: SCENE.character.facing,
+    color: SCENE.character.color,
+    strokeWidth: SCENE.character.strokeWidth
+  });
+  ctx.restore();
+
+  // Transient visual FX
+  // 1. Foot trip impact dust at frame 36
+  if (t >= 36 && t < 44) {
+    const u = (t - 36) / 8;
+    fx.dust(ctx, [SCENE.rock.x - 10, SCENE.groundY], u, { size: 14 });
+  }
+
+  // 2. Ground impact flash & dust puffs at frame 58
+  if (t >= 58 && t < 68) {
+    const u = (t - 58) / 10;
+    fx.dust(ctx, [520, SCENE.groundY], u, { size: 18 });
+    fx.dust(ctx, [590, SCENE.groundY], u, { size: 16 });
+  }
+
+  if (t === 58 || t === 59) {
+    fx.flash(ctx, cv.width, cv.height, (t - 58 + 0.5) / 2);
+  }
+
+  ctx.restore();
+}
+
+let previewRafId = null;
+window.__stopPreview = () => {
+  if (previewRafId !== null) {
+    cancelAnimationFrame(previewRafId);
+    previewRafId = null;
+  }
+};
+window.__seek = (frame) => drawFrame(Math.max(0, Math.floor(frame)));
+window.__ready = () => new Promise((resolve) => {
+  window.__stopPreview();
+  (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve())
+    .then(() => { drawFrame(0); resolve(); });
+});
+
+if (!window.__capturing) {
+  const totalFrames = SCENE.fps * SCENE.duration_s;
+  let f = 0;
+  let last = performance.now();
+  function tick(now) {
+    if (window.__capturing) {
+      previewRafId = null;
+      return;
+    }
+    f += (now - last) * SCENE.fps / 1000;
+    last = now;
+    if (f >= totalFrames) f = 0;
+    drawFrame(Math.floor(f));
+    previewRafId = requestAnimationFrame(tick);
+  }
+  previewRafId = requestAnimationFrame(tick);
+}
+</script>
+</body>
+</html>

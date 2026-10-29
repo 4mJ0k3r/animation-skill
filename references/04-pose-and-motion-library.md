@@ -60,7 +60,9 @@ walk and run). Use `walkPose(phase, gait=1)` from `rig.js`.
 
 **Crawl/fall**: legs [40, 60] both, torso −30° (leaning back), arms
 scrunched under chest; head keeps face on camera. See `POSES.down` in
-`rig.js` for the "on the ground" resting state.
+`rig.js` for the "on the ground" resting state. When animating a fallen figure
+lying on the ground, translate the canvas hip anchor down to ground level (an extra
+`+115px` down for a 320px figure) so the body rests flush against the ground line.
 
 ## 2. Named pose catalogue
 

@@ -65,6 +65,7 @@ body reads as a "mascot").
   (feet) sits at the ground line, and flip the y-axis:
   `ctx.translate(hipX, groundY); ctx.scale(1, -1);` then all figure
   coordinates are used directly.
+  *(Note for prone/fallen poses like `POSES.down`: when upright, `hipY = groundY - (thigh + shin) * scale`. When lying flat on the floor with torso at ~90°, translate the hip anchor down to `groundY` plus the torso radius offset so the fallen figure does not float above ground.)*
 - **Facing:** `facing: 1` = +x (right), `facing: -1` = -x (left).
   The same pose reads correctly in both directions — you never have to
   mirror coordinates by hand.

@@ -48,9 +48,9 @@ Draft the beat sequence using the 7-beat structure (`references/07` §1):
 Fill `story.json` per scene with position contracts (`references/07` §4):
 - For each character: `id`, `start: [x,y]`, `end: [x,y]`, `face: 1|-1`, `start_pose`, `end_pose`.
 - For each prop: `id`, `at: [x,y]`.
-- Enforce the schema and validate:
+- Enforce the schema and validate (all scripts accept relative or absolute paths):
 ```bash
-node scripts/validate_story.mjs story.json
+node scripts/validate_story.mjs path/to/story.json
 ```
 
 ### 4. Assemble Assets (One Rig, Never Redraw)
