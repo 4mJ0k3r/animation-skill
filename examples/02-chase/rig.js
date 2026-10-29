@@ -176,8 +176,13 @@ export function solve(pose = {}, opts = {}) {
   const limb = (root, a, b, len1, len2, sideSign) => {
     // Angle measured from "straight down": a = 0 -> limb hangs straight down,
     // +a swings toward the sideSign direction (screen-x).
+    // BOTH a and b are ABSOLUTE angles from the same "straight down" reference
+    // (that's how POSES and references/04 express them — e.g. [4, 0] means the
+    // whole limb hangs ~straight down, not "bend the lower bone 0° relative to
+    // a 4° upper bone"). Using a+b here was the bug that collapsed bent limbs
+    // onto a single vertical line.
     const A = (a * Math.PI) / 180;
-    const B = ((a + b) * Math.PI) / 180;
+    const B = (b * Math.PI) / 180;
     const mid = [
       root[0] + Math.sin(A) * len1 * sideSign,
       root[1] - Math.cos(A) * len1,

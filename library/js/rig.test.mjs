@@ -51,5 +51,14 @@ ok('blendPose torso', bl.torso === 10);
 ok('blendPose bob', bl.bob === 5);
 ok('blendPose armL', bl.armL[0] === 5 && bl.armL[1] === 10);
 
+// 6. Bent limb (lower angle as absolute, not relative): hand must sit BEHIND
+// the straight-down fall line, not collapse onto it. This is the regression
+// guard for the old `B = a + b` bug that drew every bent limb as one line.
+{
+  const s = solve({ armL: [0, 30] });
+  const dx = Math.abs(s.handL[0] - s.shoulder[0]);
+  ok('bent limb (lower as absolute angle) reaches off-axis', dx > 5);
+}
+
 console.log(`rig: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
