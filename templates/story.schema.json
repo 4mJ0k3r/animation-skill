@@ -1,0 +1,115 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AnimationStory",
+  "type": "object",
+  "required": ["project", "assets", "scenes"],
+  "properties": {
+    "project": {
+      "type": "object",
+      "required": ["title", "fps", "duration_s", "width", "height"],
+      "properties": {
+        "title": { "type": "string" },
+        "fps": { "type": "integer", "minimum": 1 },
+        "duration_s": { "type": "number", "minimum": 0.1 },
+        "aspect": { "type": "string" },
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 },
+        "mood": { "type": "string" }
+      }
+    },
+    "assets": {
+      "type": "object",
+      "required": ["characters"],
+      "properties": {
+        "characters": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "color", "height", "strokeWidth"],
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "color": { "type": "string" },
+              "height": { "type": "number" },
+              "strokeWidth": { "type": "number" }
+            }
+          }
+        },
+        "props": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "kind": { "type": "string" },
+              "svg": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "audio": {
+      "type": "object",
+      "properties": {
+        "voice": { "type": "object" },
+        "sfx": { "type": "array" }
+      }
+    },
+    "science": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["claim", "working", "source"],
+        "properties": {
+          "claim": { "type": "string" },
+          "working": { "type": "string" },
+          "source": { "type": "string" }
+        }
+      }
+    },
+    "scenes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "duration_s", "characters"],
+        "properties": {
+          "id": { "type": "string" },
+          "duration_s": { "type": "number", "minimum": 0.1 },
+          "camera": { "type": "object" },
+          "characters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["id", "start", "end", "face", "start_pose", "end_pose"],
+              "properties": {
+                "id": { "type": "string" },
+                "start": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+                "end": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+                "face": { "type": "integer", "enum": [-1, 1] },
+                "start_pose": { "type": "string" },
+                "end_pose": { "type": "string" },
+                "z": { "type": "integer" },
+                "props": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["id", "at"],
+                    "properties": {
+                      "id": { "type": "string" },
+                      "at": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "actions": { "type": "array" },
+          "transition_out": { "type": "string" }
+        }
+      }
+    }
+  }
+}

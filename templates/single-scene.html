@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<!--
+  templates/single-scene.html — ZERO-DEPENDENCY seekable stickman scene.
+  ----------------------------------------------------------------------
+  This is the workhorse template: one character, one location, one beat,
+  rendered by the library's rig/timeline/easing/effects, seekable to any
+  frame, loopable, and capture-ready (window.__seek + window.__ready).
+
+  WHY THIS SHAPE:
+  - No build step, no npm, no CDN: copy the 4 library files (rig.js,
+    timeline.js, easing.js, effects.js, camera.js) next to this HTML and
+    it runs from `file://` — that's what "zero-install" means here.
+  - Determinism: every frame is computed from `window.__seek(frame)`,
+    the ONLY external input. No Math.random, no Date.now, no
+    requestAnimationFrame for correctness (rAF is only used to
+    *preview* playback in a real browser; the capture path never sees it).
+  - `window.__ready()` resolves when the first frame has been laid out
+    and fonts settled — the capture script waits on it before frame 0.
+
+  How the agent uses this (pipeline step 7, "Animate"):
+  1. Copy this file to `out/scene.html`.
+  2. Fill in the SCENE block below: set the duration, the character's
+     position/facing, and keyframe the `actions` from story.json using
+     the pose names in references/04 and the easings in library/js/easing.js.
+  3. Open it in a browser (double-click). It plays once and loops.
+  4. Capture: `node scripts/capture_frames.mjs --scene out/scene.html --fps 30`
+     then `bash scripts/stitch.sh out/frames out/ 30 both`.
+
+  SEE: references/10 (the whole capture+stitch chain), references/12
+  trap (f) if your own additions make the timeline non-deterministic.
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<title>stickman scene</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #f4efe6; }
+  #stage { position: relative; width: 100vmin; height: 100vmin; margin: 0 auto; }
+  canvas { display: block; width: 100%; height: 100%; }
+  #ui { position: absolute; top: 8px; left: 8px; font: 12px/1.4 system-ui;
+        color: #666; background: #ffffffcc; padding: 4px 8px; border-radius: 6px; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c" width="960" height="960"></canvas>
+  <div id="ui"></div>
+</div>
+
+<!-- The library: ES modules, no bundler. In a real browser these resolve
+     as bare imports relative to this file. For `file://` usage, keep the
+     four files in the same folder as this HTML (or use a tiny local
+     server: `python -m http.server`). -->
+<script type="module">
+import { POSES, solve, blendPose, walkPose, drawFigure, DEFAULTS } from './rig.js';
+import { Timeline } from './timeline.js';
+import { Easing } from './easing.js';
+import * as fx from './effects.js';
+import { Camera } from './camera.js';
+
+/* ============================ SCENE ============================ */
+/* Fill this block per-project. Everything else is the (tested)
+   deterministic plumbing — leave it alone. */
+
+const SCENE = {
+  fps: 30,
+  duration_s: 8,                       // total clip length
+  width: 960, height: 960,            // canvas (square = the working default)
+  groundY: 720,                        // the y coordinate of the ground line
+  background: '#f4efe6',
+  character: {
+    id: 'hero',
+    color: '#1c1c1c',
+    height: 320,                       // px on canvas (DEFAULTS is 142; 320 reads at 960px)
+    strokeWidth: 7,
+    x: 380,                             // hip x
+    facing: 1,
+  },
+  // Keyframes: which pose, on which frames, with which easing.
+  // Pose names come from references/04 + POSES in rig.js.
+  actions: [
+    { pose: 'neutral',  frames: [0, 12] },
+    { pose: 'watch',    frames: [12, 30] },
+    { pose: 'surprised',frames: [30, 44], ease: 'backOut' },   // the gasp
+    { pose: 'neutral',  frames: [44, 78] },
+    // a little walk-in-place to sell the "alive" hold
+    { pose: 'walk', phase0: 0, frames: [78, 240], gait: 0, steps: 0.5 },
+  ],
+  face: [ // [frame, faceName] — swaps on the frame, no morph (references/05)
+    [0, 'neutral'], [30, 'surprised'], [44, 'neutral'],
+  ],
+  camera: [ // { t, x, y, zoom, shake } keys
+    { t: 0,  x: 480, y: 480, zoom: 1.0 },
+    { t: 120, x: 480, y: 430, zoom: 1.25, ease: 'power2InOut' }, // slow push-in
+    { t: 240, x: 480, y: 480, zoom: 1.0, ease: 'power2InOut' },
+  ],
+  fx: [ // e.g. { kind:'dust', at:[x,y], frames:[from,to] }
+    { kind: 'impact', at: [420, 700], frames: [40, 46] },
+  ],
+};
+
+/* ======================= SCENE END ============================= */
+
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+cv.width = SCENE.width; cv.height = SCENE.height;
+document.getElementById('ui').style.display = 'none'; // UI overlay must not appear in captured frames
+
+const cam = new Camera();
+SCENE.camera.forEach((k) => cam.add(k.t, k, Easing[k.ease] || Easing.power2InOut));
+
+// Build the character's pose timeline: one track for the *pose name*
+// (keyframed with blendPose) + one for phase (if walking) + one for x.
+const poseKeys = SCENE.actions.map(a => ({
+  t: a.frames[0],
+  v: a.pose in POSES ? POSES[a.pose] : POSES.neutral,
+  ease: a.ease ? (Easing[a.ease] || Easing.power2InOut) : Easing.power2InOut,
+  phase0: a.phase0 ?? 0,
+  gait: a.gait ?? 0,
+  steps: a.steps ?? 0,      // walk cycles per second, for the 'walk' pose
+}));
+// For a 'walk' key, pose is a *function of t* (walkPose), not a record.
+// Handle it in poseAt(t) below: if the key is a walk, blend the *angle
+// records* walkPose produces at the key's phase.
+
+function poseAt(t) {
+  // Find the two bracketing pose keys; if the current key is a walk key,
+  // sample walkPose at the right phase and blend to the next key's record.
+  let i = 0;
+  while (i < poseKeys.length - 1 && poseKeys[i + 1].t <= t) i++;
+  const a = poseKeys[i], b = poseKeys[i + 1];
+  if (!b || t <= a.t) {
+    return a.pose === 'walk'
+      ? walkPose((t * a.steps + a.phase0) % 1, a.gait)
+      : a.v;
+  }
+  const u = (t - a.t) / Math.max(1, b.t - a.t);
+  const ea = a.ease(u);
+  const pa = a.pose === 'walk' ? walkPose((t * a.steps + a.phase0) % 1, a.gait) : a.v;
+  const pb = b.pose === 'walk' ? walkPose((t * b.steps + b.phase0) % 1, b.gait) : b.v;
+  return blendPose(pa, pb, ea);
+}
+
+function faceAt(t) {
+  let f = SCENE.face[0][1];
+  for (const [ft, name] of SCENE.face) if (t >= ft) f = name;
+  return f;
+}
+
+let currentFrame = 0;
+
+function drawFrame(frame) {
+  currentFrame = frame;
+  const t = frame; // frames are the unit; fps is only for the duration math
+  const pose = { ...poseAt(t), face: faceAt(t) };
+  const camState = cam.seek(t);
+  const [shx, shy] = cam.shakeAt(t, camState);
+
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = SCENE.background;
+  ctx.fillRect(0, 0, cv.width, cv.height);
+
+  // Camera: centre on (camState.x, camState.y) at zoom, add shake.
+  ctx.save();
+  ctx.translate(cv.width / 2 + shx, cv.height / 2 + shy);
+  ctx.scale(camState.zoom, camState.zoom);
+  ctx.translate(-camState.x, -camState.y);
+
+  // Ground line
+  ctx.strokeStyle = '#d8d0c2';
+  ctx.lineWidth = 2 / camState.zoom;
+  ctx.beginPath();
+  ctx.moveTo(-200, SCENE.groundY);
+  ctx.lineTo(cv.width + 200, SCENE.groundY);
+  ctx.stroke();
+
+  // Contact shadow
+  ctx.fillStyle = '#00000018';
+  ctx.beginPath();
+  ctx.ellipse(SCENE.character.x, SCENE.groundY + 4, 60, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Character: hip at (character.x, groundY - hipHeight), y-up local space.
+  const hipY = SCENE.groundY - (DEFAULTS.thigh + DEFAULTS.shin) * (SCENE.character.height / DEFAULTS.height);
+  ctx.save();
+  ctx.translate(SCENE.character.x, hipY);
+  ctx.scale(1, -1); // local y-up
+  drawFigure(ctx, pose, {
+    height: SCENE.character.height,
+    facing: SCENE.character.facing,
+    color: SCENE.character.color,
+    strokeWidth: SCENE.character.strokeWidth,
+  });
+  ctx.restore();
+
+  // FX
+  for (const e of SCENE.fx) {
+    const [f0, f1] = e.frames;
+    if (t < f0 || t > f1) continue;
+    const u = (t - f0) / Math.max(1, f1 - f0);
+    if (e.kind === 'impact') fx.impact(ctx, e.at, u, {});
+    else if (e.kind === 'dust') fx.dust(ctx, e.at, u, {});
+    else if (e.kind === 'flash') fx.flash(ctx, cv.width, cv.height, u, '#fff');
+  }
+
+  ctx.restore();
+
+  return pose;
+}
+
+/* ---- deterministic capture contract ---------------------------- */
+let previewRafId = null;
+window.__stopPreview = () => {
+  if (previewRafId !== null) {
+    cancelAnimationFrame(previewRafId);
+    previewRafId = null;
+  }
+};
+window.__seek = (frame) => drawFrame(Math.max(0, Math.floor(frame)));
+window.__ready = () => new Promise((resolve) => {
+  window.__stopPreview();
+  // Wait for fonts to settle so frame 0 is not a fallback-font frame.
+  (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve())
+    .then(() => { drawFrame(0); resolve(); });
+});
+
+/* ---- preview loop (only in an interactive browser; the capture
+       script never calls this) ----------------------------------- */
+if (!window.__capturing) {
+  const totalFrames = SCENE.fps * SCENE.duration_s;
+  let f = 0;
+  let last = performance.now();
+  function tick(now) {
+    if (window.__capturing) {
+      previewRafId = null;
+      return;
+    }
+    f += (now - last) * SCENE.fps / 1000;
+    last = now;
+    if (f >= totalFrames) f = 0; // loop
+    drawFrame(Math.floor(f));
+    previewRafId = requestAnimationFrame(tick);
+  }
+  previewRafId = requestAnimationFrame(tick);
+}
+</script>
+</body>
+</html>

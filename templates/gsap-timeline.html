@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<!--
+  templates/gsap-timeline.html — GSAP-driven deterministic timeline template.
+  --------------------------------------------------------------------------
+  Uses a paused GSAP Timeline: tl = gsap.timeline({ paused: true }).
+  window.__seek(frame) seeks tl to (frame / fps). The wall-clock ticker
+  is NEVER running.
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<title>GSAP deterministic animation</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #f4efe6; }
+  #stage { position: relative; width: 100vmin; height: 100vmin; margin: 0 auto; }
+  canvas { display: block; width: 100%; height: 100%; }
+</style>
+<!-- GSAP CDN (or local copy if offline) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c" width="960" height="960"></canvas>
+</div>
+
+<script type="module">
+import { POSES, solve, blendPose, drawFigure, DEFAULTS } from './rig.js';
+
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+const fps = 30;
+const duration_s = 4;
+const totalFrames = fps * duration_s;
+
+const state = {
+  x: 480,
+  y: 720,
+  pose: { ...POSES.neutral },
+  color: '#1c1c1c'
+};
+
+function render() {
+  ctx.fillStyle = '#f4efe6';
+  ctx.fillRect(0, 0, cv.width, cv.height);
+
+  // Ground line
+  ctx.strokeStyle = '#d8d0c2';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(0, state.y);
+  ctx.lineTo(cv.width, state.y);
+  ctx.stroke();
+
+  // Shadow
+  ctx.fillStyle = '#00000018';
+  ctx.beginPath();
+  ctx.ellipse(state.x, state.y + 4, 60, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Figure
+  const hipY = state.y - (DEFAULTS.thigh + DEFAULTS.shin) * (320 / DEFAULTS.height);
+  ctx.save();
+  ctx.translate(state.x, hipY);
+  ctx.scale(1, -1);
+  drawFigure(ctx, state.pose, { height: 320, facing: 1, color: state.color, strokeWidth: 7 });
+  ctx.restore();
+}
+
+// PAUSED GSAP Timeline — determinism contract
+const tl = gsap.timeline({ paused: true, onUpdate: render });
+
+tl.to(state, {
+  duration: 1.0,
+  x: 520,
+  ease: "power2.inOut",
+  onUpdate: () => {
+    state.pose = blendPose(POSES.neutral, POSES.wave, tl.progress());
+  }
+});
+tl.to(state, {
+  duration: 1.0,
+  x: 480,
+  ease: "power2.out",
+  onUpdate: () => {
+    state.pose = blendPose(POSES.wave, POSES.neutral, (tl.progress() - 0.5) * 2);
+  }
+});
+
+/* ---- deterministic capture contract ---------------------------- */
+window.__seek = (frame) => {
+  const t = Math.max(0, Math.min(frame / fps, duration_s));
+  tl.seek(t);
+  render();
+};
+
+window.__ready = () => new Promise((resolve) => {
+  (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve())
+    .then(() => {
+      window.__seek(0);
+      resolve();
+    });
+});
+</script>
+</body>
+</html>

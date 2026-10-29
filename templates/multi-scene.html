@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<!--
+  templates/multi-scene.html — multi-scene seekable animation with transitions.
+  -----------------------------------------------------------------------------
+  Supports multiple scenes in sequence, position contracts across cuts,
+  multiple characters (hero + secondary), props, and standard transitions:
+  - 'cut': instantaneous cut
+  - 'match_cut': cut where character pose matches across boundary
+  - 'fade_white': dip to white (passage of time)
+  - 'fade_black': dip to black (act break / finish)
+  - 'whip_pan': fast motion blur across cut
+
+  Contract: window.__seek(frame) + window.__ready().
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<title>multi-scene animation</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #f4efe6; }
+  #stage { position: relative; width: 100vmin; height: 100vmin; margin: 0 auto; }
+  canvas { display: block; width: 100%; height: 100%; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c" width="960" height="960"></canvas>
+</div>
+
+<script type="module">
+import { POSES, solve, blendPose, walkPose, drawFigure, DEFAULTS } from './rig.js';
+import { Timeline } from './timeline.js';
+import { Easing } from './easing.js';
+import * as fx from './effects.js';
+import { Camera } from './camera.js';
+
+/* ============================ PROJECT CONFIG ============================ */
+export const PROJECT = {
+  fps: 30,
+  width: 960,
+  height: 960,
+  scenes: [
+    {
+      id: 'scene_01',
+      duration_s: 3,
+      groundY: 720,
+      background: '#f4efe6',
+      characters: [
+        {
+          id: 'hero',
+          height: 320,
+          color: '#1c1c1c',
+          strokeWidth: 7,
+          x: [240, 520], // lerp x over scene
+          facing: 1,
+          actions: [
+            { pose: 'walk', phase0: 0, frames: [0, 90], gait: 0.8, steps: 0.8 }
+          ],
+          face: [[0, 'determined']]
+        }
+      ],
+      props: [],
+      camera: [
+        { t: 0, x: 480, y: 480, zoom: 1.0 }
+      ],
+      fx: [],
+      transitionOut: { type: 'cut', frames: 0 }
+    },
+    {
+      id: 'scene_02',
+      duration_s: 3,
+      groundY: 720,
+      background: '#f4efe6',
+      characters: [
+        {
+          id: 'hero',
+          height: 320,
+          color: '#1c1c1c',
+          strokeWidth: 7,
+          x: [520, 520],
+          facing: 1,
+          actions: [
+            { pose: 'surprised', frames: [0, 30], ease: 'backOut' },
+            { pose: 'wave', frames: [30, 90], ease: 'power2InOut' }
+          ],
+          face: [[0, 'surprised'], [30, 'happy']]
+        }
+      ],
+      props: [],
+      camera: [
+        { t: 0, x: 520, y: 450, zoom: 1.2 }
+      ],
+      fx: [
+        { kind: 'impact', at: [520, 680], frames: [0, 8] }
+      ],
+      transitionOut: { type: 'fade_black', frames: 10 }
+    }
+  ]
+};
+/* ======================== END PROJECT CONFIG ============================ */
+
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+cv.width = PROJECT.width;
+cv.height = PROJECT.height;
+
+// Calculate frame ranges for each scene
+let accumulatedFrames = 0;
+const sceneRanges = PROJECT.scenes.map((sc) => {
+  const fCount = Math.round(sc.duration_s * PROJECT.fps);
+  const startF = accumulatedFrames;
+  accumulatedFrames += fCount;
+  return {
+    ...sc,
+    startFrame: startF,
+    endFrame: accumulatedFrames,
+    totalFrames: fCount,
+    cam: (() => {
+      const c = new Camera();
+      (sc.camera || []).forEach(k => c.add(k.t, k, Easing[k.ease] || Easing.power2InOut));
+      return c;
+    })()
+  };
+});
+const totalProjectFrames = accumulatedFrames;
+
+function poseAt(actions, t) {
+  if (!actions || actions.length === 0) return POSES.neutral;
+  const poseKeys = actions.map(a => ({
+    t: a.frames[0],
+    endT: a.frames[1] ?? (a.frames[0] + 1),
+    poseName: a.pose,
+    v: a.pose in POSES ? POSES[a.pose] : POSES.neutral,
+    ease: a.ease ? (Easing[a.ease] || Easing.power2InOut) : Easing.power2InOut,
+    phase0: a.phase0 ?? 0,
+    gait: a.gait ?? 0,
+    steps: a.steps ?? 0,
+  }));
+
+  let i = 0;
+  while (i < poseKeys.length - 1 && poseKeys[i + 1].t <= t) i++;
+  const a = poseKeys[i], b = poseKeys[i + 1];
+
+  const getPoseSample = (k, time) => {
+    if (k.poseName === 'walk') {
+      return walkPose((time * k.steps + k.phase0) % 1, k.gait);
+    }
+    return k.v;
+  };
+
+  if (!b || t <= a.t) {
+    return getPoseSample(a, t);
+  }
+
+  const u = Math.min(1, Math.max(0, (t - a.t) / Math.max(1, b.t - a.t)));
+  const ea = a.ease(u);
+  const pa = getPoseSample(a, t);
+  const pb = getPoseSample(b, t);
+  return blendPose(pa, pb, ea);
+}
+
+function faceAt(faceList, t) {
+  if (!faceList || faceList.length === 0) return 'neutral';
+  let f = faceList[0][1];
+  for (const [ft, name] of faceList) {
+    if (t >= ft) f = name;
+  }
+  return f;
+}
+
+function drawFrame(globalFrame) {
+  const gF = Math.max(0, Math.min(globalFrame, totalProjectFrames - 1));
+  
+  // Find current scene
+  let sc = sceneRanges[0];
+  for (const s of sceneRanges) {
+    if (gF >= s.startFrame && gF < s.endFrame) {
+      sc = s;
+      break;
+    }
+  }
+  if (gF >= sceneRanges[sceneRanges.length - 1].endFrame) {
+    sc = sceneRanges[sceneRanges.length - 1];
+  }
+
+  const localF = gF - sc.startFrame;
+
+  // Background
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = sc.background || '#f4efe6';
+  ctx.fillRect(0, 0, cv.width, cv.height);
+
+  // Camera
+  const camState = sc.cam.seek(localF);
+  const [shx, shy] = sc.cam.shakeAt(localF, camState);
+
+  ctx.save();
+  ctx.translate(cv.width / 2 + shx, cv.height / 2 + shy);
+  ctx.scale(camState.zoom || 1, camState.zoom || 1);
+  ctx.translate(-(camState.x || cv.width / 2), -(camState.y || cv.height / 2));
+
+  // Ground line
+  ctx.strokeStyle = '#d8d0c2';
+  ctx.lineWidth = 2 / (camState.zoom || 1);
+  ctx.beginPath();
+  ctx.moveTo(-500, sc.groundY || 720);
+  ctx.lineTo(cv.width + 500, sc.groundY || 720);
+  ctx.stroke();
+
+  // Props
+  for (const p of (sc.props || [])) {
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    if (p.draw) {
+      p.draw(ctx);
+    } else if (p.kind === 'rock') {
+      ctx.fillStyle = p.color || '#8c8275';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, p.rx || 24, p.ry || 14, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // Characters
+  for (const ch of (sc.characters || [])) {
+    const chX = Array.isArray(ch.x)
+      ? ch.x[0] + (ch.x[1] - ch.x[0]) * (localF / Math.max(1, sc.totalFrames))
+      : (ch.x || 480);
+    const pose = {
+      ...poseAt(ch.actions, localF),
+      face: faceAt(ch.face, localF)
+    };
+
+    // Shadow
+    ctx.fillStyle = '#00000018';
+    ctx.beginPath();
+    ctx.ellipse(chX, (sc.groundY || 720) + 4, 60 * (ch.height / 320), 8 * (ch.height / 320), 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Figure
+    const hipY = (sc.groundY || 720) - (DEFAULTS.thigh + DEFAULTS.shin) * (ch.height / DEFAULTS.height);
+    ctx.save();
+    ctx.translate(chX, hipY);
+    ctx.scale(1, -1);
+    drawFigure(ctx, pose, {
+      height: ch.height || 320,
+      facing: ch.facing || 1,
+      color: ch.color || '#1c1c1c',
+      strokeWidth: ch.strokeWidth || 7
+    });
+    ctx.restore();
+  }
+
+  // FX
+  for (const e of (sc.fx || [])) {
+    const [f0, f1] = e.frames;
+    if (localF < f0 || localF > f1) continue;
+    const u = (localF - f0) / Math.max(1, f1 - f0);
+    if (e.kind === 'impact') fx.impact(ctx, e.at, u, {});
+    else if (e.kind === 'dust') fx.dust(ctx, e.at, u, {});
+    else if (e.kind === 'flash') fx.flash(ctx, cv.width, cv.height, u, '#fff');
+  }
+
+  ctx.restore(); // camera restore
+
+  // Transitions
+  if (sc.transitionOut && sc.transitionOut.frames > 0) {
+    const transLen = sc.transitionOut.frames;
+    const transStart = sc.totalFrames - transLen;
+    if (localF >= transStart) {
+      const u = (localF - transStart) / transLen;
+      if (sc.transitionOut.type === 'fade_white') {
+        ctx.fillStyle = `rgba(255, 255, 255, ${u})`;
+        ctx.fillRect(0, 0, cv.width, cv.height);
+      } else if (sc.transitionOut.type === 'fade_black') {
+        ctx.fillStyle = `rgba(0, 0, 0, ${u})`;
+        ctx.fillRect(0, 0, cv.width, cv.height);
+      } else if (sc.transitionOut.type === 'whip_pan') {
+        ctx.fillStyle = `rgba(244, 239, 230, ${u * 0.7})`;
+        ctx.fillRect(0, 0, cv.width, cv.height);
+      }
+    }
+  }
+}
+
+/* ---- deterministic capture contract ---------------------------- */
+let previewRafId = null;
+window.__stopPreview = () => {
+  if (previewRafId !== null) {
+    cancelAnimationFrame(previewRafId);
+    previewRafId = null;
+  }
+};
+window.__seek = (frame) => drawFrame(Math.max(0, Math.floor(frame)));
+window.__ready = () => new Promise((resolve) => {
+  window.__stopPreview();
+  (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve())
+    .then(() => { drawFrame(0); resolve(); });
+});
+
+/* ---- preview loop ---------------------------------------------- */
+if (!window.__capturing) {
+  let f = 0;
+  let last = performance.now();
+  function tick(now) {
+    if (window.__capturing) {
+      previewRafId = null;
+      return;
+    }
+    f += (now - last) * PROJECT.fps / 1000;
+    last = now;
+    if (f >= totalProjectFrames) f = 0;
+    drawFrame(Math.floor(f));
+    previewRafId = requestAnimationFrame(tick);
+  }
+  previewRafId = requestAnimationFrame(tick);
+}
+</script>
+</body>
+</html>
