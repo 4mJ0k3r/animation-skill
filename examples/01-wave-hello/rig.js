@@ -153,24 +153,34 @@ export function solve(pose = {}, opts = {}) {
     thigh: D.thigh * s, shin: D.shin * s,
   };
 
-  // Root: hip sits L.thigh + L.shin above the ground (y = 0 = ground).
+  // Root: hip sits L.thigh + L.shin ABOVE the ground in "local" space, where
+  // y=0 is the ground line and y grows UPWARD (so hip.y = thigh+shin for a
+  // standing figure, feet land at y≈0). This is the convention the whole
+  // solver is written in: `limb()` below measures angles from "straight down"
+  // (0° = hang toward the ground), and `drawFigure`/scene code flip this to
+  // screen coordinates.
   const hip = [0, L.thigh + L.shin + (p.bob ?? 0) * s];
 
   // Spine lean. torso=0 -> upright; +torso leans toward the facing direction.
+  // BUG FIX (was: shoulder/neckTop/head were all computed with a MINUS
+  // cos(...) term, which pushed them BELOW the hip instead of above it —
+  // that's what made every leaned/bent pose render with the head at the
+  // bottom of the figure instead of the top. The "limb hangs downward"
+  // convention used for arms/legs does NOT apply to the spine: the spine
+  // always goes UP from the hip regardless of how far it leans.
   const torsoA = (p.torso ?? 0) * (Math.PI / 180);
-  // Shoulder sits above the hip; lean shifts it.
   const shoulder = [
     hip[0] + Math.sin(torsoA) * L.torso * face,
-    hip[1] - Math.cos(torsoA) * L.torso,
+    hip[1] + Math.cos(torsoA) * L.torso,
   ];
   const neckTop = [
     shoulder[0] + Math.sin(torsoA) * L.neck * face,
-    shoulder[1] - Math.cos(torsoA) * L.neck,
+    shoulder[1] + Math.cos(torsoA) * L.neck,
   ];
   const headTilt = (p.headTilt ?? 0) * (Math.PI / 180);
   const headCenter = [
     neckTop[0] + Math.sin(torsoA + headTilt) * L.headR * face,
-    neckTop[1] - Math.cos(torsoA + headTilt) * L.headR,
+    neckTop[1] + Math.cos(torsoA + headTilt) * L.headR,
   ];
 
   const limb = (root, a, b, len1, len2, sideSign) => {
