@@ -1,0 +1,52 @@
+{
+  "$schema": "../../templates/story.schema.json",
+  "project": {
+    "title": "01 Wave Hello",
+    "fps": 30,
+    "duration_s": 2,
+    "aspect": "1:1",
+    "width": 960,
+    "height": 960,
+    "mood": "playful"
+  },
+  "assets": {
+    "characters": [
+      {
+        "id": "hero",
+        "name": "Stickman",
+        "color": "#1c1c1c",
+        "height": 320,
+        "strokeWidth": 7
+      }
+    ],
+    "props": []
+  },
+  "scenes": [
+    {
+      "id": "scene_01",
+      "duration_s": 2,
+      "camera": {
+        "start": { "x": 480, "y": 480, "zoom": 1.0 },
+        "end": { "x": 480, "y": 480, "zoom": 1.0 }
+      },
+      "characters": [
+        {
+          "id": "hero",
+          "start": [480, 720],
+          "end": [480, 720],
+          "face": 1,
+          "start_pose": "neutral",
+          "end_pose": "neutral",
+          "z": 0,
+          "props": []
+        }
+      ],
+      "actions": [
+        { "pose": "neutral", "frames": [0, 10] },
+        { "pose": "wave", "frames": [10, 45], "ease": "power2InOut" },
+        { "pose": "neutral", "frames": [45, 60], "ease": "power2Out" }
+      ],
+      "transition_out": "none"
+    }
+  ]
+}

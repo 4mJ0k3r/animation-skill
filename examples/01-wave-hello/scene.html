@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>01 Wave Hello</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #f4efe6; }
+  #stage { position: relative; width: 100vmin; height: 100vmin; margin: 0 auto; }
+  canvas { display: block; width: 100%; height: 100%; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c" width="960" height="960"></canvas>
+</div>
+
+<script type="module">
+import { POSES, solve, blendPose, walkPose, drawFigure, DEFAULTS } from './rig.js';
+import { Timeline } from './timeline.js';
+import { Easing } from './easing.js';
+import * as fx from './effects.js';
+import { Camera } from './camera.js';
+
+const SCENE = {
+  fps: 30,
+  duration_s: 2,
+  width: 960,
+  height: 960,
+  groundY: 720,
+  background: '#f4efe6',
+  character: {
+    id: 'hero',
+    color: '#1c1c1c',
+    height: 320,
+    strokeWidth: 7,
+    x: 480,
+    facing: 1
+  },
+  actions: [
+    { pose: 'neutral', frames: [0, 10] },
+    { pose: 'wave', frames: [10, 45], ease: 'power2InOut' },
+    { pose: 'neutral', frames: [45, 60], ease: 'power2Out' }
+  ],
+  face: [
+    [0, 'neutral'],
+    [10, 'happy'],
+    [45, 'neutral']
+  ],
+  camera: [
+    { t: 0, x: 480, y: 480, zoom: 1.0 }
+  ],
+  fx: []
+};
+
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+cv.width = SCENE.width;
+cv.height = SCENE.height;
+
+const cam = new Camera();
+SCENE.camera.forEach(k => cam.add(k.t, k, Easing[k.ease] || Easing.power2InOut));
+
+const poseKeys = SCENE.actions.map(a => ({
+  t: a.frames[0],
+  v: a.pose in POSES ? POSES[a.pose] : POSES.neutral,
+  ease: a.ease ? (Easing[a.ease] || Easing.power2InOut) : Easing.power2InOut
+}));
+
+function poseAt(t) {
+  let i = 0;
+  while (i < poseKeys.length - 1 && poseKeys[i + 1].t <= t) i++;
+  const a = poseKeys[i], b = poseKeys[i + 1];
+  if (!b || t <= a.t) return a.v;
+  const u = (t - a.t) / Math.max(1, b.t - a.t);
+  const ea = a.ease(u);
+  return blendPose(a.v, b.v, ea);
+}
+
+function faceAt(t) {
+  let f = SCENE.face[0][1];
+  for (const [ft, name] of SCENE.face) {
+    if (t >= ft) f = name;
+  }
+  return f;
+}
+
+function drawFrame(frame) {
+  const t = frame;
+  const pose = { ...poseAt(t), face: faceAt(t) };
+  const camState = cam.seek(t);
+  const [shx, shy] = cam.shakeAt(t, camState);
+
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = SCENE.background;
+  ctx.fillRect(0, 0, cv.width, cv.height);
+
+  ctx.save();
+  ctx.translate(cv.width / 2 + shx, cv.height / 2 + shy);
+  ctx.scale(camState.zoom, camState.zoom);
+  ctx.translate(-camState.x, -camState.y);
+
+  // Ground line
+  ctx.strokeStyle = '#d8d0c2';
+  ctx.lineWidth = 2 / camState.zoom;
+  ctx.beginPath();
+  ctx.moveTo(-200, SCENE.groundY);
+  ctx.lineTo(cv.width + 200, SCENE.groundY);
+  ctx.stroke();
+
+  // Shadow
+  ctx.fillStyle = '#00000018';
+  ctx.beginPath();
+  ctx.ellipse(SCENE.character.x, SCENE.groundY + 4, 60, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Figure
+  const hipY = SCENE.groundY - (DEFAULTS.thigh + DEFAULTS.shin) * (SCENE.character.height / DEFAULTS.height);
+  ctx.save();
+  ctx.translate(SCENE.character.x, hipY);
+  ctx.scale(1, -1);
+  drawFigure(ctx, pose, {
+    height: SCENE.character.height,
+    facing: SCENE.character.facing,
+    color: SCENE.character.color,
+    strokeWidth: SCENE.character.strokeWidth
+  });
+  ctx.restore();
+
+  ctx.restore();
+}
+
+let previewRafId = null;
+window.__stopPreview = () => {
+  if (previewRafId !== null) {
+    cancelAnimationFrame(previewRafId);
+    previewRafId = null;
+  }
+};
+window.__seek = (frame) => drawFrame(Math.max(0, Math.floor(frame)));
+window.__ready = () => new Promise((resolve) => {
+  window.__stopPreview();
+  (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve())
+    .then(() => { drawFrame(0); resolve(); });
+});
+
+if (!window.__capturing) {
+  const totalFrames = SCENE.fps * SCENE.duration_s;
+  let f = 0;
+  let last = performance.now();
+  function tick(now) {
+    if (window.__capturing) {
+      previewRafId = null;
+      return;
+    }
+    f += (now - last) * SCENE.fps / 1000;
+    last = now;
+    if (f >= totalFrames) f = 0;
+    drawFrame(Math.floor(f));
+    previewRafId = requestAnimationFrame(tick);
+  }
+  previewRafId = requestAnimationFrame(tick);
+}
+</script>
+</body>
+</html>

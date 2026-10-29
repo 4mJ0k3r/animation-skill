@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>03 What If You Jumped Off The Earth?</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #f4efe6; }
+  #stage { position: relative; width: 100vmin; height: 100vmin; margin: 0 auto; }
+  canvas { display: block; width: 100%; height: 100%; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c" width="960" height="960"></canvas>
+</div>
+
+<script type="module">
+import { POSES, solve, blendPose, walkPose, drawFigure, DEFAULTS } from './rig.js';
+import { Timeline } from './timeline.js';
+import { Easing } from './easing.js';
+import * as fx from './effects.js';
+import { Camera } from './camera.js';
+
+const fps = 30;
+const sc1Frames = 150; // 5s
+const sc2Frames = 180; // 6s
+const sc3Frames = 150; // 5s
+const totalFrames = sc1Frames + sc2Frames + sc3Frames; // 480 frames = 16s
+
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+cv.width = 960;
+cv.height = 960;
+
+function drawFrame(frame) {
+  const gF = Math.max(0, Math.min(frame, totalFrames - 1));
+
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+  if (gF < sc1Frames) {
+    // ================= SCENE 1: Normal Jump (0..149) =================
+    const localF = gF;
+    ctx.fillStyle = '#f4efe6';
+    ctx.fillRect(0, 0, cv.width, cv.height);
+
+    const groundY = 720;
+    // Ground
+    ctx.strokeStyle = '#d8d0c2';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, groundY);
+    ctx.lineTo(cv.width, groundY);
+    ctx.stroke();
+
+    // Title Card in first 40 frames
+    if (localF < 50) {
+      const u = Math.min(1, localF / 15);
+      fx.textPop(ctx, 'WHAT IF YOU JUMPED OFF EARTH?', [480, 220], u, {
+        font: '900 36px system-ui',
+        color: '#1c1c1c'
+      });
+    }
+
+    // Normal jump physics: crouch 30..40, launch 40..50, peak 50..58, land 58..68
+    let charY = groundY;
+    let pose = POSES.neutral;
+    if (localF < 30) {
+      pose = POSES.neutral;
+    } else if (localF < 42) {
+      // crouch anticipation
+      const u = (localF - 30) / 12;
+      pose = blendPose(POSES.neutral, POSES.surprised, Easing.power2InOut(u));
+    } else if (localF < 54) {
+      // jump up: 0.5m ~ 60px
+      const u = (localF - 42) / 12;
+      charY = groundY - Math.sin(u * Math.PI * 0.5) * 60;
+      pose = POSES.surprised;
+    } else if (localF < 66) {
+      // fall down
+      const u = (localF - 54) / 12;
+      charY = (groundY - 60) + u * 60;
+      pose = POSES.surprised;
+    } else if (localF < 78) {
+      // landing crouch
+      pose = blendPose(POSES.surprised, POSES.neutral, (localF - 66) / 12);
+      if (localF === 66 || localF === 67) {
+        fx.dust(ctx, [480, groundY], 0.2, { size: 16 });
+      }
+    } else {
+      pose = POSES.shrug;
+    }
+
+    // Readout on screen
+    if (localF >= 70 && localF < 140) {
+      ctx.fillStyle = '#666';
+      ctx.font = '600 24px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText('Normal human vertical jump: ~0.5 m (v ≈ 3.1 m/s)', 480, 260);
+    }
+
+    // Shadow
+    const shadowScale = Math.max(0.4, 1 - (groundY - charY) / 120);
+    ctx.fillStyle = '#00000018';
+    ctx.beginPath();
+    ctx.ellipse(480, groundY + 4, 60 * shadowScale, 8 * shadowScale, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Figure
+    const hipY = charY - (DEFAULTS.thigh + DEFAULTS.shin) * (320 / DEFAULTS.height);
+    ctx.save();
+    ctx.translate(480, hipY);
+    ctx.scale(1, -1);
+    drawFigure(ctx, pose, { height: 320, facing: 1, color: '#1c1c1c', strokeWidth: 7 });
+    ctx.restore();
+
+    // Whip pan transition out (last 6 frames)
+    if (localF >= 144) {
+      const u = (localF - 144) / 6;
+      ctx.fillStyle = `rgba(244, 239, 230, ${u * 0.8})`;
+      ctx.fillRect(0, 0, cv.width, cv.height);
+    }
+
+  } else if (gF < sc1Frames + sc2Frames) {
+    // ================= SCENE 2: The Super Jump & Escape Velocity =================
+    const localF = gF - sc1Frames;
+    ctx.fillStyle = '#f4efe6';
+    ctx.fillRect(0, 0, cv.width, cv.height);
+
+    // Launch upward: localF 0..180
+    // Camera moves with launch
+    const launchU = Math.min(1, localF / 100);
+    const speed = Easing.power3In(launchU);
+    const charY = 720 - speed * 800;
+
+    // Speedlines behind rocket jump
+    fx.speedLines(ctx, [480, charY + 80], { dir: [0, -1], lines: 6, len: 45, fade: 0.6 });
+    if (localF < 30) {
+      fx.dust(ctx, [480, 720], localF / 30, { size: 36 });
+    }
+
+    // Science HUD / Readouts
+    ctx.fillStyle = '#1c1c1c';
+    ctx.font = '900 32px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText('ESCAPE VELOCITY', 480, 180);
+
+    ctx.font = '700 24px monospace';
+    ctx.fillStyle = '#c0392b';
+    ctx.fillText('v_e = √(2GM/R) = 11.2 km/s', 480, 220);
+
+    ctx.font = '600 20px system-ui';
+    ctx.fillStyle = '#555';
+    ctx.fillText('(Mach 33 — 40,320 km/h)', 480, 255);
+
+    // Figure flying up
+    const hipY = charY - (DEFAULTS.thigh + DEFAULTS.shin) * (320 / DEFAULTS.height);
+    ctx.save();
+    ctx.translate(480, hipY);
+    ctx.scale(1, -1);
+    drawFigure(ctx, POSES.runA, { height: 320, facing: 1, color: '#1c1c1c', strokeWidth: 7 });
+    ctx.restore();
+
+    // Transition out: white flash into space
+    if (localF >= 170) {
+      const u = (localF - 170) / 10;
+      ctx.fillStyle = `rgba(255, 255, 255, ${u})`;
+      ctx.fillRect(0, 0, cv.width, cv.height);
+    }
+
+  } else {
+    // ================= SCENE 3: Space Orbit & Punchline =================
+    const localF = gF - (sc1Frames + sc2Frames);
+    // Space background
+    ctx.fillStyle = '#0b0f19';
+    ctx.fillRect(0, 0, cv.width, cv.height);
+
+    // Stars (deterministic seeded)
+    for (let i = 0; i < 40; i++) {
+      const sx = fx.hash(i, 1) * cv.width;
+      const sy = fx.hash(i, 2) * (cv.height * 0.7);
+      const sr = 1 + fx.hash(i, 3) * 1.5;
+      ctx.fillStyle = '#ffffffaa';
+      ctx.beginPath();
+      ctx.arc(sx, sy, sr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Earth crescent at bottom
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(480, 1100, 400, 0, Math.PI * 2);
+    ctx.fillStyle = '#1e3799';
+    ctx.fill();
+    ctx.strokeStyle = '#4a69bd';
+    ctx.lineWidth = 12;
+    ctx.stroke();
+    ctx.restore();
+
+    // Floating stickman in zero-G
+    const floatBob = Math.sin(localF * 0.05) * 15;
+    const charX = 480;
+    const charY = 380 + floatBob;
+
+    let pose = POSES.shrug;
+    if (localF > 60) {
+      const u = Math.min(1, (localF - 60) / 20);
+      pose = blendPose(POSES.shrug, POSES.wave, Easing.power2InOut(u));
+    }
+
+    const hipY = charY - (DEFAULTS.thigh + DEFAULTS.shin) * (260 / DEFAULTS.height);
+    ctx.save();
+    ctx.translate(charX, hipY);
+    ctx.rotate(Math.sin(localF * 0.03) * 0.15); // gentle zero-g roll
+    ctx.scale(1, -1);
+    drawFigure(ctx, pose, { height: 260, facing: 1, color: '#f4efe6', strokeWidth: 6 });
+    ctx.restore();
+
+    // Punchline text pop
+    if (localF >= 40) {
+      const u = Math.min(1, (localF - 40) / 15);
+      fx.textPop(ctx, 'Forgot the spaceship.', [480, 200], u, {
+        font: '900 36px system-ui',
+        color: '#f4efe6'
+      });
+    }
+
+    // Fade to black at the end
+    if (localF >= 135) {
+      const u = (localF - 135) / 15;
+      ctx.fillStyle = `rgba(0, 0, 0, ${u})`;
+      ctx.fillRect(0, 0, cv.width, cv.height);
+    }
+  }
+}
+
+let previewRafId = null;
+window.__stopPreview = () => {
+  if (previewRafId !== null) {
+    cancelAnimationFrame(previewRafId);
+    previewRafId = null;
+  }
+};
+window.__seek = (frame) => drawFrame(Math.max(0, Math.floor(frame)));
+window.__ready = () => new Promise((resolve) => {
+  window.__stopPreview();
+  (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve())
+    .then(() => { drawFrame(0); resolve(); });
+});
+
+if (!window.__capturing) {
+  let f = 0;
+  let last = performance.now();
+  function tick(now) {
+    if (window.__capturing) {
+      previewRafId = null;
+      return;
+    }
+    f += (now - last) * fps / 1000;
+    last = now;
+    if (f >= totalFrames) f = 0;
+    drawFrame(Math.floor(f));
+    previewRafId = requestAnimationFrame(tick);
+  }
+  previewRafId = requestAnimationFrame(tick);
+}
+</script>
+</body>
+</html>

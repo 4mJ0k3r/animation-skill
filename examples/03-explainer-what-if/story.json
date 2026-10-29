@@ -1,0 +1,123 @@
+{
+  "$schema": "../../templates/story.schema.json",
+  "project": {
+    "title": "03 What If You Jumped Off The Earth?",
+    "fps": 30,
+    "duration_s": 16,
+    "aspect": "1:1",
+    "width": 960,
+    "height": 960,
+    "mood": "playful"
+  },
+  "assets": {
+    "characters": [
+      {
+        "id": "hero",
+        "name": "Stickman Scientist",
+        "color": "#1c1c1c",
+        "height": 320,
+        "strokeWidth": 7
+      }
+    ],
+    "props": [
+      {
+        "id": "earth",
+        "name": "Planet Earth",
+        "kind": "circle"
+      }
+    ]
+  },
+  "science": [
+    {
+      "claim": "Human vertical jump takeoff velocity is approximately 3.1 m/s for a 0.5 m jump",
+      "working": "v = sqrt(2 * g * h) = sqrt(2 * 9.81 * 0.5) = 3.13 m/s",
+      "source": "Journal of Applied Biomechanics, Linthorne (2001)"
+    },
+    {
+      "claim": "Earth escape velocity is 11.2 km/s (Mach 33)",
+      "working": "v_e = sqrt(2 * G * M / R) = sqrt(2 * 6.67430e-11 * 5.9722e24 / 6.371e6) = 11,186 m/s = 11.2 km/s",
+      "source": "NASA Planetary Fact Sheet - Earth (nssdc.gsfc.nasa.gov)"
+    }
+  ],
+  "scenes": [
+    {
+      "id": "scene_01_hook_and_jump",
+      "duration_s": 5,
+      "camera": {
+        "start": { "x": 480, "y": 480, "zoom": 1.0 },
+        "end": { "x": 480, "y": 480, "zoom": 1.0 }
+      },
+      "characters": [
+        {
+          "id": "hero",
+          "start": [480, 720],
+          "end": [480, 720],
+          "face": 1,
+          "start_pose": "neutral",
+          "end_pose": "neutral",
+          "z": 0,
+          "props": []
+        }
+      ],
+      "actions": [
+        { "pose": "neutral", "frames": [0, 30] },
+        { "pose": "surprised", "frames": [30, 45], "ease": "backOut" },
+        { "pose": "down", "frames": [45, 75] },
+        { "pose": "neutral", "frames": [75, 150] }
+      ],
+      "transition_out": "whip_pan"
+    },
+    {
+      "id": "scene_02_escape_launch",
+      "duration_s": 6,
+      "camera": {
+        "start": { "x": 480, "y": 480, "zoom": 1.0 },
+        "end": { "x": 480, "y": 300, "zoom": 0.8 }
+      },
+      "characters": [
+        {
+          "id": "hero",
+          "start": [480, 720],
+          "end": [480, 100],
+          "face": 1,
+          "start_pose": "runA",
+          "end_pose": "surprised",
+          "z": 0,
+          "props": []
+        }
+      ],
+      "actions": [
+        { "pose": "runA", "frames": [0, 40] },
+        { "pose": "surprised", "frames": [40, 180] }
+      ],
+      "transition_out": "fade_white"
+    },
+    {
+      "id": "scene_03_space_orbit",
+      "duration_s": 5,
+      "camera": {
+        "start": { "x": 480, "y": 480, "zoom": 1.0 },
+        "end": { "x": 480, "y": 480, "zoom": 1.0 }
+      },
+      "characters": [
+        {
+          "id": "hero",
+          "start": [480, 400],
+          "end": [480, 400],
+          "face": 1,
+          "start_pose": "shrug",
+          "end_pose": "wave",
+          "z": 1,
+          "props": [
+            { "id": "earth", "at": [480, 750] }
+          ]
+        }
+      ],
+      "actions": [
+        { "pose": "shrug", "frames": [0, 75] },
+        { "pose": "wave", "frames": [75, 150] }
+      ],
+      "transition_out": "fade_black"
+    }
+  ]
+}

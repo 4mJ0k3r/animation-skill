@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>02 The Chase</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #f4efe6; }
+  #stage { position: relative; width: 100vmin; height: 100vmin; margin: 0 auto; }
+  canvas { display: block; width: 100%; height: 100%; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c" width="960" height="960"></canvas>
+</div>
+
+<script type="module">
+import { POSES, solve, blendPose, walkPose, drawFigure, DEFAULTS } from './rig.js';
+import { Timeline } from './timeline.js';
+import { Easing } from './easing.js';
+import * as fx from './effects.js';
+import { Camera } from './camera.js';
+
+const fps = 30;
+const scene1Frames = 90;
+const scene2Frames = 90;
+const totalFrames = scene1Frames + scene2Frames;
+
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+cv.width = 960;
+cv.height = 960;
+
+const cam1 = new Camera();
+cam1.add(0, { x: 480, y: 480, zoom: 1.0, shake: 0 });
+
+const cam2 = new Camera();
+cam2.add(0, { x: 480, y: 440, zoom: 1.25, shake: 3 });
+
+function drawFrame(frame) {
+  const gF = Math.max(0, Math.min(frame, totalFrames - 1));
+  const isScene1 = gF < scene1Frames;
+  const localF = isScene1 ? gF : (gF - scene1Frames);
+
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = '#f4efe6';
+  ctx.fillRect(0, 0, cv.width, cv.height);
+
+  const cam = isScene1 ? cam1 : cam2;
+  const camState = cam.seek(localF);
+  const [shx, shy] = cam.shakeAt(localF, camState);
+
+  ctx.save();
+  ctx.translate(cv.width / 2 + shx, cv.height / 2 + shy);
+  ctx.scale(camState.zoom, camState.zoom);
+  ctx.translate(-camState.x, -camState.y);
+
+  // Ground line
+  const groundY = 720;
+  ctx.strokeStyle = '#d8d0c2';
+  ctx.lineWidth = 2 / camState.zoom;
+  ctx.beginPath();
+  ctx.moveTo(-500, groundY);
+  ctx.lineTo(cv.width + 500, groundY);
+  ctx.stroke();
+
+  if (isScene1) {
+    // Scene 1: Hero running left to right, Chaser behind
+    const heroU = localF / scene1Frames;
+    const heroX = 200 + (750 - 200) * heroU;
+    const heroPose = walkPose(localF * 0.08, 1.0); // gait=1 run
+
+    const chaserU = localF / scene1Frames;
+    const chaserX = 60 + (680 - 60) * chaserU;
+    const chaserPose = walkPose(localF * 0.09, 1.0);
+
+    // Dust behind runners
+    if (localF % 10 < 5) {
+      fx.dust(ctx, [heroX - 30, groundY], (localF % 10) / 5, { size: 14 });
+      fx.dust(ctx, [chaserX - 25, groundY], (localF % 10) / 5, { size: 12 });
+    }
+
+    // Draw Chaser (z=0, blue, 0.7x scale)
+    const chaserH = 224;
+    const chaserHipY = groundY - (DEFAULTS.thigh + DEFAULTS.shin) * (chaserH / DEFAULTS.height);
+    ctx.fillStyle = '#00000018';
+    ctx.beginPath();
+    ctx.ellipse(chaserX, groundY + 4, 42, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.save();
+    ctx.translate(chaserX, chaserHipY);
+    ctx.scale(1, -1);
+    drawFigure(ctx, chaserPose, { height: chaserH, facing: 1, color: '#0984e3', strokeWidth: 5 });
+    ctx.restore();
+
+    // Draw Hero (z=1, black, full scale)
+    const heroH = 320;
+    const heroHipY = groundY - (DEFAULTS.thigh + DEFAULTS.shin) * (heroH / DEFAULTS.height);
+    ctx.fillStyle = '#00000018';
+    ctx.beginPath();
+    ctx.ellipse(heroX, groundY + 4, 60, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.save();
+    ctx.translate(heroX, heroHipY);
+    ctx.scale(1, -1);
+    drawFigure(ctx, heroPose, { height: heroH, facing: 1, color: '#1c1c1c', strokeWidth: 7 });
+    ctx.restore();
+  } else {
+    // Scene 2: Match cut continuation! Closer shot, fast pace
+    const heroU = localF / scene2Frames;
+    const heroX = 280 + (720 - 280) * heroU;
+    let heroPose;
+    if (localF < 60) {
+      heroPose = walkPose(localF * 0.08, 1.0);
+    } else if (localF < 75) {
+      const u = (localF - 60) / 15;
+      heroPose = blendPose(walkPose(localF * 0.08, 1.0), POSES.surprised, Easing.backOut(u));
+    } else {
+      heroPose = POSES.runA;
+    }
+
+    const chaserU = localF / scene2Frames;
+    const chaserX = 160 + (560 - 160) * chaserU;
+    const chaserPose = walkPose(localF * 0.085, 1.0);
+
+    // Dust
+    if (localF % 8 < 4) {
+      fx.dust(ctx, [heroX - 35, groundY], (localF % 8) / 4, { size: 16 });
+      fx.dust(ctx, [chaserX - 25, groundY], (localF % 8) / 4, { size: 12 });
+    }
+
+    // Speed lines
+    fx.speedLines(ctx, [heroX - 40, groundY - 120], { lines: 4, len: 35, fade: 0.4 });
+
+    // Draw Chaser
+    const chaserH = 224;
+    const chaserHipY = groundY - (DEFAULTS.thigh + DEFAULTS.shin) * (chaserH / DEFAULTS.height);
+    ctx.fillStyle = '#00000018';
+    ctx.beginPath();
+    ctx.ellipse(chaserX, groundY + 4, 42, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.save();
+    ctx.translate(chaserX, chaserHipY);
+    ctx.scale(1, -1);
+    drawFigure(ctx, chaserPose, { height: chaserH, facing: 1, color: '#0984e3', strokeWidth: 5 });
+    ctx.restore();
+
+    // Draw Hero
+    const heroH = 320;
+    const heroHipY = groundY - (DEFAULTS.thigh + DEFAULTS.shin) * (heroH / DEFAULTS.height);
+    ctx.fillStyle = '#00000018';
+    ctx.beginPath();
+    ctx.ellipse(heroX, groundY + 4, 60, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.save();
+    ctx.translate(heroX, heroHipY);
+    ctx.scale(1, -1);
+    drawFigure(ctx, heroPose, { height: heroH, facing: 1, color: '#1c1c1c', strokeWidth: 7 });
+    ctx.restore();
+  }
+
+  ctx.restore();
+
+  // Transition out: Fade to black over last 12 frames
+  if (gF >= totalFrames - 12) {
+    const fadeU = (gF - (totalFrames - 12)) / 12;
+    ctx.fillStyle = `rgba(0, 0, 0, ${fadeU})`;
+    ctx.fillRect(0, 0, cv.width, cv.height);
+  }
+}
+
+let previewRafId = null;
+window.__stopPreview = () => {
+  if (previewRafId !== null) {
+    cancelAnimationFrame(previewRafId);
+    previewRafId = null;
+  }
+};
+window.__seek = (frame) => drawFrame(Math.max(0, Math.floor(frame)));
+window.__ready = () => new Promise((resolve) => {
+  window.__stopPreview();
+  (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve())
+    .then(() => { drawFrame(0); resolve(); });
+});
+
+if (!window.__capturing) {
+  let f = 0;
+  let last = performance.now();
+  function tick(now) {
+    if (window.__capturing) {
+      previewRafId = null;
+      return;
+    }
+    f += (now - last) * fps / 1000;
+    last = now;
+    if (f >= totalFrames) f = 0;
+    drawFrame(Math.floor(f));
+    previewRafId = requestAnimationFrame(tick);
+  }
+  previewRafId = requestAnimationFrame(tick);
+}
+</script>
+</body>
+</html>
