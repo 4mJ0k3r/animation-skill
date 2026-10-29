@@ -90,6 +90,7 @@ function faceToSVG(name) {
 
 // 1. Characters
 ensureDir(join(root, 'characters'));
+writeFileSync(join(root, 'characters', 'stickman.svg'), poseToSVG(POSES.neutral, { color: '#1c1c1c' }));
 writeFileSync(join(root, 'characters', 'hero-default.svg'), poseToSVG(POSES.neutral, { color: '#1c1c1c' }));
 writeFileSync(join(root, 'characters', 'secondary-mascot.svg'), poseToSVG(POSES.neutral, { color: '#0984e3', height: 224, strokeWidth: 5 }));
 
@@ -116,10 +117,105 @@ writeFileSync(join(root, 'props', 'box.svg'), `<svg xmlns="http://www.w3.org/200
   <line x1="10" y1="40" x2="70" y2="40" stroke="#8a5a2a" stroke-width="2" />
 </svg>`);
 
+writeFileSync(join(root, 'props', 'bench.svg'), `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 70" width="120" height="70">
+  <rect x="10" y="25" width="100" height="12" rx="2" fill="#8c5836" stroke="#5a3418" stroke-width="2" />
+  <line x1="25" y1="37" x2="25" y2="65" stroke="#333" stroke-width="5" stroke-linecap="round" />
+  <line x1="95" y1="37" x2="95" y2="65" stroke="#333" stroke-width="5" stroke-linecap="round" />
+</svg>`);
+
+writeFileSync(join(root, 'props', 'table.svg'), `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 90" width="140" height="90">
+  <rect x="10" y="20" width="120" height="14" rx="2" fill="#c49a6c" stroke="#7a5530" stroke-width="3" />
+  <line x1="25" y1="34" x2="25" y2="85" stroke="#7a5530" stroke-width="6" stroke-linecap="round" />
+  <line x1="115" y1="34" x2="115" y2="85" stroke="#7a5530" stroke-width="6" stroke-linecap="round" />
+</svg>`);
+
+writeFileSync(join(root, 'props', 'door.svg'), `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 180" width="100" height="180">
+  <rect x="10" y="10" width="80" height="165" fill="#e5d5be" stroke="#8b7355" stroke-width="4" />
+  <circle cx="25" cy="95" r="5" fill="#d4af37" stroke="#8b7355" stroke-width="2" />
+</svg>`);
+
+writeFileSync(join(root, 'props', 'ball.svg'), `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 60" width="60" height="60">
+  <circle cx="30" cy="30" r="24" fill="#e74c3c" stroke="#c0392b" stroke-width="3" />
+  <circle cx="22" cy="22" r="5" fill="#ffffff88" />
+</svg>`);
+
+writeFileSync(join(root, 'props', 'laptop.svg'), `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 60" width="80" height="60">
+  <polygon points="10,50 70,50 65,42 15,42" fill="#bdc3c7" stroke="#7f8c8d" stroke-width="2" />
+  <polygon points="18,42 62,42 58,15 22,15" fill="#2c3e50" stroke="#7f8c8d" stroke-width="2" />
+  <rect x="25" y="18" width="30" height="20" fill="#3498db" />
+</svg>`);
+
+writeFileSync(join(root, 'props', 'heart.svg'), `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 60" width="60" height="60">
+  <path d="M 30 50 Q 10 32 10 20 A 10 10 0 0 1 30 16 A 10 10 0 0 1 50 20 Q 50 32 30 50 Z" fill="#e74c3c" stroke="#c0392b" stroke-width="2" />
+</svg>`);
+
+writeFileSync(join(root, 'props', 'sun.svg'), `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80">
+  <circle cx="40" cy="40" r="18" fill="#f1c40f" stroke="#f39c12" stroke-width="3" />
+  <g stroke="#f39c12" stroke-width="3" stroke-linecap="round">
+    <line x1="40" y1="8" x2="40" y2="16" />
+    <line x1="40" y1="64" x2="40" y2="72" />
+    <line x1="8" y1="40" x2="16" y2="40" />
+    <line x1="64" y1="40" x2="72" y2="40" />
+    <line x1="17" y1="17" x2="23" y2="23" />
+    <line x1="57" y1="57" x2="63" y2="63" />
+    <line x1="17" y1="63" x2="23" y2="57" />
+    <line x1="57" y1="23" x2="63" y2="17" />
+  </g>
+</svg>`);
+
+writeFileSync(join(root, 'props', 'cloud.svg'), `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 70" width="120" height="70">
+  <path d="M 25 50 Q 10 50 15 35 Q 20 20 40 22 Q 55 10 75 20 Q 95 12 100 32 Q 115 38 105 50 Z" fill="#ecf0f1" stroke="#bdc3c7" stroke-width="3" />
+</svg>`);
+
+writeFileSync(join(root, 'props', 'tree.svg'), `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 160" width="120" height="160">
+  <rect x="52" y="90" width="16" height="65" rx="2" fill="#795548" stroke="#4e342e" stroke-width="3" />
+  <circle cx="60" cy="65" r="45" fill="#2ecc71" stroke="#27ae60" stroke-width="4" />
+</svg>`);
+
 // 5. Backgrounds
 ensureDir(join(root, 'backgrounds'));
 writeFileSync(join(root, 'backgrounds', 'ground-line.svg'), `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 100" width="960" height="100">
   <line x1="0" y1="50" x2="960" y2="50" stroke="#d8d0c2" stroke-width="3" stroke-linecap="round" />
+</svg>`);
+
+writeFileSync(join(root, 'backgrounds', 'room.svg'), `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" width="960" height="540">
+  <rect width="960" height="400" fill="#fdfbf7" />
+  <rect y="400" width="960" height="140" fill="#e8dec8" />
+  <line x1="0" y1="400" x2="960" y2="400" stroke="#8b7355" stroke-width="4" />
+  <!-- Window -->
+  <rect x="650" y="80" width="180" height="180" fill="#dff9fb" stroke="#778ca3" stroke-width="5" />
+  <line x1="740" y1="80" x2="740" y2="260" stroke="#778ca3" stroke-width="4" />
+  <line x1="650" y1="170" x2="830" y2="170" stroke="#778ca3" stroke-width="4" />
+</svg>`);
+
+writeFileSync(join(root, 'backgrounds', 'street.svg'), `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" width="960" height="540">
+  <rect width="960" height="380" fill="#c7ecee" />
+  <rect y="380" width="960" height="70" fill="#dcdde1" />
+  <rect y="450" width="960" height="90" fill="#718093" />
+  <line x1="0" y1="380" x2="960" y2="380" stroke="#7f8fa6" stroke-width="2" />
+  <line x1="0" y1="450" x2="960" y2="450" stroke="#2f3640" stroke-width="3" />
+</svg>`);
+
+writeFileSync(join(root, 'backgrounds', 'park.svg'), `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" width="960" height="540">
+  <rect width="960" height="340" fill="#dff9fb" />
+  <path d="M 0 380 Q 240 320 480 360 Q 720 400 960 340 L 960 540 L 0 540 Z" fill="#badc58" stroke="#6ab04c" stroke-width="4" />
+</svg>`);
+
+writeFileSync(join(root, 'backgrounds', 'void-gradient.svg'), `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" width="960" height="540">
+  <defs>
+    <radialGradient id="voidGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#e2d9cc" />
+    </radialGradient>
+  </defs>
+  <rect width="960" height="540" fill="url(#voidGrad)" />
+</svg>`);
+
+writeFileSync(join(root, 'backgrounds', 'night.svg'), `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" width="960" height="540">
+  <rect width="960" height="420" fill="#130f40" />
+  <rect y="420" width="960" height="120" fill="#0c2461" />
+  <!-- Moon -->
+  <circle cx="800" cy="100" r="35" fill="#f6e58d" />
 </svg>`);
 
 console.log('✓ Generated SVG asset library mirroring rig.js.');
