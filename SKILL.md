@@ -130,3 +130,26 @@ Provide the user with:
 | FFmpeg flags, headless capture | `references/10-rendering-and-export.md` |
 | QA checklists and pass/fail criteria | `references/11-qa-checklist.md` |
 | Common traps, bugs, and fixes | `references/12-traps-and-troubleshooting.md` |
+
+---
+
+## Honest Limits
+
+Know the edge of what this skill can produce in pure code:
+
+- **Style ceiling:** stick figures and simple vector silhouettes. No
+  painted/textured/illustrated characters — for those, an image model
+  (or Lottie/designer-authored assets) is the right tool, not this repo.
+- **Acting ceiling:** named cycles and beats (walk, run, jump, trip,
+  wave, surprise, throw) plus keyed emotion swaps. No nuanced
+  performance acting or multi-character dialogue choreography.
+- **Audio:** TTS/SFX/music services are paid; the default is a silent
+  animation. Only add audio on explicit request, then target
+  −14 LUFS (`references/09`).
+- **Determinism:** the export path needs Playwright's Chromium (~118 MB
+  one-time download) — the only heavy requirement in an otherwise
+  install-light repo. Anything that reaches for wall-clock time breaks
+  the frame-identical contract and fails capture.
+- **Verification:** "the file plays" is not the bar — a clip is done
+  only after the contact-sheet pass and the determinism diff
+  (`references/11` gate (e)).

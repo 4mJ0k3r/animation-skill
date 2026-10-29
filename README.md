@@ -51,7 +51,8 @@ animation-skill/
 │   ├── stitch.sh / .mjs         # FFmpeg MP4 & GIF stitchers
 │   ├── contact_sheet.py         # Pillow 8x8 contact sheet generator
 │   ├── validate_story.mjs       # story.json contract validator
-│   └── generate_svg_library.mjs # Rig-to-SVG asset exporter
+│   ├── generate_svg_library.mjs # Rig-to-SVG asset exporter
+│   └── check_links.mjs          # Verify every URL in references/00
 │
 ├── references/                  # Deep technical documentation (00 to 12)
 │   ├── 00-source-index.md       # Upstream source index and link hub
@@ -71,7 +72,8 @@ animation-skill/
 └── examples/
     ├── 01-wave-hello/           # Single-scene 2s wave animation
     ├── 02-chase/                # Two-scene 6s sprint chase with match cut
-    └── 03-explainer-what-if/    # Three-scene 16s science explainer
+    ├── 03-explainer-what-if/    # Three-scene 16s science explainer
+    └── 04-cold-start-trip/      # 4s trip-over-rock cold-start verification
 ```
 
 ---
@@ -103,6 +105,7 @@ python scripts/contact_sheet.py out/01/frames 8x8 out/01/contact.jpg
 - **01 Wave Hello:** Single stickman standing, waving to camera, returning to neutral. Demonstrates discrete facial swaps without morphing and ease-in-out limb movement.
 - **02 The Chase:** Multi-character scene. Hero pursued by faster secondary character (0.7× scale, blue). Demonstrates procedural running gait (`walkPose`), dust particles, dynamic camera shake, and match-cut continuity.
 - **03 What If You Jumped Off The Earth?:** 16-second explainer animation following the 7-beat structure. Demonstrates vertical launch, speed lines, space scene with seeded star field, HUD calculations, and NASA-sourced science.
+- **04 Cold-Start Trip:** 4-second single-scene "stickman trips over a rock and gets back up" — the repo's cold-start verification example, demonstrating procedural walk, trip/fall with `power2In` gravity, impact flash, and the get-up settle.
 
 ---
 
