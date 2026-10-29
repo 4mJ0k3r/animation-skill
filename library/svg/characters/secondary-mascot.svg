@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <g fill="none" stroke="#0984e3" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Spine -->
+    <line x1="200.0" y1="162.0" x2="200.0" y2="253.0" />
+    <!-- Left Arm -->
+    <polyline points="200.0,239.0 195.9,278.0 191.8,317.0" />
+    <!-- Right Arm -->
+    <polyline points="200.0,239.0 195.9,278.0 191.8,317.0" />
+    <!-- Left Leg -->
+    <polyline points="200.0,162.0 196.6,210.9 193.2,259.8" />
+    <!-- Right Leg -->
+    <polyline points="200.0,162.0 196.6,210.9 193.2,259.8" />
+    <!-- Head -->
+    <circle cx="200.0" cy="275.4" r="22.4" fill="#ffffff" />
+  </g>
+</svg>
